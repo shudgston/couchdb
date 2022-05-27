@@ -227,6 +227,19 @@ jwt_authentication_handler(Req) ->
             RequiredClaims = get_configured_claims(),
             case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
+                    couch_log:info("Claims: ~p", [Claims]),
+                    Roles_Claim_Name = config:get(
+                        "jwt_auth", "roles_claim_name", "_couchdb.roles"
+                    ),
+                    Roles_Claim_Path = [list_to_binary(Item) || Item <- string:split(config:get(
+                        "jwt_auth", "roles_claim_path", ""
+                    ), ".")],
+                    Roles_Full_Path = lists:append(Roles_Claim_Path, [list_to_binary(Roles_Claim_Name)]),
+                    Roles = couch_util:get_nested_json_value({Claims},Roles_Full_Path),
+                    couch_log:info("Roles Claim Path: ~p", [Roles_Claim_Path]),
+                    couch_log:info("Roles Claim Name: ~p", [Roles_Claim_Name]),
+                    couch_log:info("Roles Full Name:  ~p", [Roles_Full_Path]),
+                    couch_log:info("Nested-Claim-Roles:  ~p", [Roles]),
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false ->
                             throw({unauthorized, <<"Token missing sub claim.">>});
@@ -234,15 +247,7 @@ jwt_authentication_handler(Req) ->
                             Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = User,
-                                    roles = couch_util:get_value(
-                                        ?l2b(
-                                            config:get(
-                                                "jwt_auth", "roles_claim_name", "_couchdb.roles"
-                                            )
-                                        ),
-                                        Claims,
-                                        []
-                                    )
+                                    roles = Roles
                                 }
                             }
                     end;
