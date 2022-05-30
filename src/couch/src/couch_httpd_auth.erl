@@ -281,22 +281,6 @@ get_role_claims(Claims) ->
                         ),
                         Token_CouchDBRoles
                 end;
-            "_couchdb.roles" ->
-                % explicitly stated value in config file
-                % inform the user to migrate to roles_claim_path
-                couch_log:info(
-                    "Use of 'roles_claim_name' is deprecated. Please migrate to 'roles_claim_path'!",
-                    []
-                ),
-                couch_util:get_value(
-                    ?l2b(
-                        config:get(
-                            "jwt_auth", "roles_claim_name"
-                        )
-                    ),
-                    Claims,
-                    []
-                );
             _ ->
                 % other value for `roles_claim_name` found.
                 if
