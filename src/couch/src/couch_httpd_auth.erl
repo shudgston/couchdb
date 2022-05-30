@@ -227,7 +227,7 @@ jwt_authentication_handler(Req) ->
             RequiredClaims = get_configured_claims(),
             case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
-                    {ok, Roles} = get_role_claims(Claims),
+                    {ok, Roles} = get_roles_claim(Claims),
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false ->
                             throw({unauthorized, <<"Token missing sub claim.">>});
@@ -246,7 +246,7 @@ jwt_authentication_handler(Req) ->
             Req
     end.
 
-get_role_claims(Claims) ->
+get_roles_claim(Claims) ->
     Roles_Claim_Name_Param = config:get(
         "jwt_auth", "roles_claim_name"
     ),
