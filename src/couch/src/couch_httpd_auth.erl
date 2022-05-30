@@ -227,19 +227,7 @@ jwt_authentication_handler(Req) ->
             RequiredClaims = get_configured_claims(),
             case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
-                    couch_log:info("Claims: ~p", [Claims]),
-                    Roles_Claim_Name = config:get(
-                        "jwt_auth", "roles_claim_name", "_couchdb.roles"
-                    ),
-                    Roles_Claim_Path = [list_to_binary(Item) || Item <- string:split(config:get(
-                        "jwt_auth", "roles_claim_path", ""
-                    ), ".")],
-                    Roles_Full_Path = lists:append(Roles_Claim_Path, [list_to_binary(Roles_Claim_Name)]),
-                    Roles = couch_util:get_nested_json_value({Claims},Roles_Full_Path),
-                    couch_log:info("Roles Claim Path: ~p", [Roles_Claim_Path]),
-                    couch_log:info("Roles Claim Name: ~p", [Roles_Claim_Name]),
-                    couch_log:info("Roles Full Name:  ~p", [Roles_Full_Path]),
-                    couch_log:info("Nested-Claim-Roles:  ~p", [Roles]),
+                    {ok, Roles} = get_role_claims(Claims),
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false ->
                             throw({unauthorized, <<"Token missing sub claim.">>});
@@ -257,6 +245,68 @@ jwt_authentication_handler(Req) ->
         _ ->
             Req
     end.
+
+get_role_claims(Claims) ->
+    Roles_Claim_Name_Param = config:get(
+        "jwt_auth", "roles_claim_name"
+    ),
+    Roles_Claim_Path_Param = config:get(
+        "jwt_auth", "roles_claim_path"
+    ),
+    Roles = case Roles_Claim_Name_Param of
+        undefined ->
+            % Check for implicitly role_claim "_couchdb.roles" in JWT token
+            case lists:keyfind(<<"_couchdb.roles">>, 1, Claims) of
+                false ->
+                    % `_couchdb.roles` not found in token
+                    % check if `roles_claim_path` is set
+                    case Roles_Claim_Path_Param of
+                        undefined ->
+                            [];
+                        _ ->
+                            % no implicit or explicit value for `_couchdb.roles` found, use `roles_claim_path`
+                            Roles_Claim_Path = [?l2b(Item) || Item <- string:tokens(Roles_Claim_Path_Param, ".")],
+                            couch_util:get_nested_json_value({Claims},Roles_Claim_Path)
+                    end;
+                {_, Token_CouchDBRoles} ->
+                    % `_couchdb.roles` found in token, read value
+                    couch_log:info("Implicit value for `_couchdb.roles` found and used in token, please migrate to" ++
+                        " `roles_claim_path`!", []),
+                    Token_CouchDBRoles
+            end;
+        "_couchdb.roles" ->
+            % explicitly stated value in config file
+            % inform the user to migrate to roles_claim_path
+            couch_log:info("Use of 'roles_claim_name' is deprecated. Please migrate to 'roles_claim_path'!", []),
+            couch_util:get_value(
+                ?l2b(
+                    config:get(
+                        "jwt_auth", "roles_claim_name"
+                    )
+                ),
+                Claims,
+                []
+            );
+        _ ->
+            % other value for `roles_claim_name` found.
+            if
+                Roles_Claim_Path_Param =/= undefined ->
+                    couch_log:info("Both, 'roles_claim_name' and 'roles_claim_path' are set. For backwards" ++
+                    " compatibility, only `roles_claim_name`is used!", []);
+                true ->
+                    couch_log:info("Use of 'roles_claim_name' is deprecated. Please migrate to 'roles_claim_path'!", [])
+            end,
+            couch_util:get_value(
+                ?l2b(
+                    config:get(
+                        "jwt_auth", "roles_claim_name"
+                    )
+                ),
+                Claims,
+                []
+            )
+        end,
+    {ok, Roles}.
 
 get_configured_claims() ->
     Claims = config:get("jwt_auth", "required_claims", ""),
