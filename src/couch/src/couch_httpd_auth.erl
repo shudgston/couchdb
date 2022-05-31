@@ -227,7 +227,7 @@ jwt_authentication_handler(Req) ->
             RequiredClaims = get_configured_claims(),
             case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
-                    {ok, Roles} = get_roles_claim(Claims),
+                    Roles = get_roles_claim(Claims),
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false ->
                             throw({unauthorized, <<"Token missing sub claim.">>});
@@ -246,67 +246,45 @@ jwt_authentication_handler(Req) ->
             Req
     end.
 
+tokenize_json_path(Path, SliceStart, [], Result) ->
+    Result ++ [?l2b(string:slice(Path, SliceStart))];
+tokenize_json_path(Path, SliceStart, [[{Pos, _}] | T], Result) ->
+    S = string:replace(string:slice(Path, SliceStart, Pos - SliceStart), "\\.", ".", all),
+    NewResult = Result ++ [?l2b(S)],
+    tokenize_json_path(Path, Pos + 1, T, NewResult).
+
+tokenize_json_path(Path, SliceStart, SplitPositions) ->
+    tokenize_json_path(Path, SliceStart, SplitPositions, []).
+
+tokenize_json_path(Path, SplitPositions) ->
+    tokenize_json_path(Path, 0, SplitPositions).
+
 get_roles_claim(Claims) ->
-    Roles_Claim_Name_Param = config:get(
-        "jwt_auth", "roles_claim_name"
-    ),
-    Roles_Claim_Path_Param = config:get(
+    RolesClaimPath = config:get(
         "jwt_auth", "roles_claim_path"
     ),
-    Roles =
-        case Roles_Claim_Name_Param of
-            undefined ->
-                % Check for implicitly role_claim "_couchdb.roles" in JWT token
-                case lists:keyfind(<<"_couchdb.roles">>, 1, Claims) of
-                    false ->
-                        % `_couchdb.roles` not found in token
-                        % check if `roles_claim_path` is set
-                        case Roles_Claim_Path_Param of
-                            undefined ->
-                                [];
-                            _ ->
-                                % no implicit or explicit value for `_couchdb.roles` found, use `roles_claim_path`
-                                Roles_Claim_Path = [
-                                    ?l2b(Item)
-                                 || Item <- string:tokens(Roles_Claim_Path_Param, ".")
-                                ],
-                                couch_util:get_nested_json_value({Claims}, Roles_Claim_Path)
-                        end;
-                    {_, Token_CouchDBRoles} ->
-                        % `_couchdb.roles` found in token, read value
-                        couch_log:info(
-                            "Implicit value for `_couchdb.roles` found and used in token, please migrate to" ++
-                                " `roles_claim_path`!",
-                            []
-                        ),
-                        Token_CouchDBRoles
-                end;
-            _ ->
-                % other value for `roles_claim_name` found.
-                if
-                    Roles_Claim_Path_Param =/= undefined ->
-                        couch_log:info(
-                            "Both, 'roles_claim_name' and 'roles_claim_path' are set. For backwards" ++
-                                " compatibility, only `roles_claim_name`is used!",
-                            []
-                        );
-                    true ->
-                        couch_log:info(
-                            "Use of 'roles_claim_name' is deprecated. Please migrate to 'roles_claim_path'!",
-                            []
-                        )
+    case RolesClaimPath of
+        undefined ->
+            couch_util:get_value(
+                ?l2b(
+                    config:get(
+                        "jwt_auth", "roles_claim_name", "_couchdb.roles"
+                    )
+                ),
+                Claims,
+                []
+            );
+        _ ->
+            %find all "." but no "\."
+            PathRegex = "(?<!\\\\)\\.",
+            MatchPositions =
+                case re:run(RolesClaimPath, PathRegex, [global]) of
+                    nomatch -> [];
+                    {match, Pos} -> Pos
                 end,
-                couch_util:get_value(
-                    ?l2b(
-                        config:get(
-                            "jwt_auth", "roles_claim_name"
-                        )
-                    ),
-                    Claims,
-                    []
-                )
-        end,
-    {ok, Roles}.
+            TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
+            couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
+    end.
 
 get_configured_claims() ->
     Claims = config:get("jwt_auth", "required_claims", ""),
