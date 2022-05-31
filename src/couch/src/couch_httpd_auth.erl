@@ -253,11 +253,8 @@ tokenize_json_path(Path, SliceStart, [[{Pos, _}] | T], Result) ->
     NewResult = Result ++ [?l2b(S)],
     tokenize_json_path(Path, Pos + 1, T, NewResult).
 
-tokenize_json_path(Path, SliceStart, SplitPositions) ->
-    tokenize_json_path(Path, SliceStart, SplitPositions, []).
-
 tokenize_json_path(Path, SplitPositions) ->
-    tokenize_json_path(Path, 0, SplitPositions).
+    tokenize_json_path(Path, 0, SplitPositions, []).
 
 get_roles_claim(Claims) ->
     RolesClaimPath = config:get(
