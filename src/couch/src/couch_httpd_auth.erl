@@ -247,10 +247,11 @@ jwt_authentication_handler(Req) ->
     end.
 
 tokenize_json_path(Path, SliceStart, [], Result) ->
-    Result ++ [?l2b(string:slice(Path, SliceStart))];
+    Result1 = Result ++ [?l2b(string:slice(Path, SliceStart))],
+    [?l2b(string:replace(X, "\\.", ".", all)) || X <- Result1];
 tokenize_json_path(Path, SliceStart, [[{Pos, _}] | T], Result) ->
-    S = string:replace(string:slice(Path, SliceStart, Pos - SliceStart), "\\.", ".", all),
-    NewResult = Result ++ [?l2b(S)],
+    Slice = string:slice(Path, SliceStart, Pos - SliceStart),
+    NewResult = Result ++ [?l2b(Slice)],
     tokenize_json_path(Path, Pos + 1, T, NewResult).
 
 tokenize_json_path(Path, SplitPositions) ->
@@ -272,7 +273,7 @@ get_roles_claim(Claims) ->
                 []
             );
         _ ->
-            %find all "." but no "\."
+            % find all "." but no "\."
             PathRegex = "(?<!\\\\)\\.",
             MatchPositions =
                 case re:run(RolesClaimPath, PathRegex, [global]) of
