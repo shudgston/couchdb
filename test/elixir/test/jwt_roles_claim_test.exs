@@ -7,10 +7,11 @@ defmodule JwtRolesClaimTest do
     %{
       :section => "chttpd",
       :key => "authentication_handlers",
-      :value => ~w(
-        {chttpd_auth, jwt_authentication_handler},
-        {chttpd_auth, cookie_authentication_handler},
-        {chttpd_auth, default_authentication_handler}) |> Enum.join()
+      :value => [
+                  "{chttpd_auth, jwt_authentication_handler}, ",
+                  "{chttpd_auth, cookie_authentication_handler}, ",
+                  "{chttpd_auth, default_authentication_handler})"
+                ] |> Enum.join
     },
     %{
       :section => "jwt_keys",
@@ -41,7 +42,7 @@ defmodule JwtRolesClaimTest do
     delete_db(@testdb)
   end
 
-  test "case: roles_claim_name (undefined) / roles_claim_path (undefined)", context do
+  test "case: roles_claim_name (undefined) / roles_claim_path (undefined)" do
     server_config = @global_server_config
 
     run_on_modified_server(server_config, fn ->
@@ -49,7 +50,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
-  test "case: roles_claim_name (defined) / roles_claim_path (undefined)", context do
+  test "case: roles_claim_name (defined) / roles_claim_path (undefined)" do
     server_config =
       [
         %{
@@ -64,7 +65,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
-  test "case: roles_claim_name (undefined) / roles_claim_path (defined)", context do
+  test "case: roles_claim_name (undefined) / roles_claim_path (defined)" do
     server_config =
       [
         %{
@@ -79,7 +80,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
-  test "case: roles_claim_name (defined) / roles_claim_path (defined)", context do
+  test "case: roles_claim_name (defined) / roles_claim_path (defined)" do
     server_config =
       [
         %{
