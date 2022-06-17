@@ -1,8 +1,6 @@
 defmodule JwtRolesClaimTest do
   use CouchTestCase
 
-  @testdb "jwttestdb"
-
   @global_server_config [
     %{
       :section => "chttpd",
@@ -22,25 +20,6 @@ defmodule JwtRolesClaimTest do
         kHgX5EuLg2MeBuiT/qJACs1J0apruOOJCg/gOtkjB4c=) |> Enum.join()
     }
   ]
-
-  setup do
-    # Create db if not exists
-    Couch.put("/#{@testdb}")
-
-    resp =
-      Couch.get(
-        "/#{@testdb}/_changes",
-        query: [feed: "longpoll", timeout: 5000, filter: "_design"]
-      )
-
-    assert resp.body
-    on_exit(&tear_down/0)
-    :ok
-  end
-
-  defp tear_down do
-    delete_db(@testdb)
-  end
 
   test "case: roles_claim_name (undefined) / roles_claim_path (undefined)" do
     server_config = @global_server_config
