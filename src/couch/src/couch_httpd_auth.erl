@@ -261,27 +261,36 @@ get_roles_claim(Claims) ->
     RolesClaimPath = config:get(
         "jwt_auth", "roles_claim_path"
     ),
-    case RolesClaimPath of
-        undefined ->
-            couch_util:get_value(
-                ?l2b(
-                    config:get(
-                        "jwt_auth", "roles_claim_name", "_couchdb.roles"
-                    )
-                ),
-                Claims,
-                []
-            );
-        _ ->
-            % find all "." but no "\."
-            PathRegex = "(?<!\\\\)\\.",
-            MatchPositions =
-                case re:run(RolesClaimPath, PathRegex, [global]) of
-                    nomatch -> [];
-                    {match, Pos} -> Pos
-                end,
-            TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
-            couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
+    Result =
+        case RolesClaimPath of
+            undefined ->
+                couch_util:get_value(
+                    ?l2b(
+                        config:get(
+                            "jwt_auth", "roles_claim_name", "_couchdb.roles"
+                        )
+                    ),
+                    Claims,
+                    []
+                );
+            _ ->
+                % find all "." but no "\."
+                PathRegex = "(?<!\\\\)\\.",
+                MatchPositions =
+                    case re:run(RolesClaimPath, PathRegex, [global]) of
+                        nomatch -> [];
+                        {match, Pos} -> Pos
+                    end,
+                TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
+                couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
+        end,
+    case is_list(Result) of
+        true ->
+            Result;
+        false ->
+            throw(
+                {bad_request, <<"Malformed JWT roles claim. Needs to be a JSON array of strings.">>}
+            )
     end.
 
 get_configured_claims() ->
