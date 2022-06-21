@@ -286,10 +286,16 @@ get_roles_claim(Claims) ->
         end,
     case is_list(Result) of
         true ->
+            [
+                throw(
+                    {bad_request, <<"Malformed JWT roles claim. Must be a JSON list of strings">>}
+                )
+             || R <- Result, not is_binary(R)
+            ],
             Result;
         false ->
             throw(
-                {bad_request, <<"Malformed JWT roles claim. Needs to be a JSON array of strings.">>}
+                {bad_request, <<"Malformed JWT roles claim. Needs to be a JSON list of strings.">>}
             )
     end.
 
