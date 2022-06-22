@@ -284,18 +284,12 @@ get_roles_claim(Claims) ->
                 TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
                 couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
         end,
-    case is_list(Result) of
+    case lists:all(fun erlang:is_binary/1, Result) of
         true ->
-            [
-                throw(
-                    {bad_request, <<"Malformed JWT roles claim. Must be a JSON list of strings">>}
-                )
-             || R <- Result, not is_binary(R)
-            ],
             Result;
         false ->
             throw(
-                {bad_request, <<"Malformed JWT roles claim. Needs to be a JSON list of strings.">>}
+                {bad_request, <<"Malformed token">>}
             )
     end.
 
