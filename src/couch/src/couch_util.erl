@@ -43,6 +43,7 @@
 -export([set_process_priority/2]).
 -export([hmac/3]).
 -export([version_to_binary/1]).
+-export([validate_design_access/1, validate_design_access/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -792,3 +793,16 @@ version_to_binary(Ver) when is_list(Ver) ->
     Ver1 = lists:reverse(lists:dropwhile(IsZero, lists:reverse(Ver))),
     Ver2 = [erlang:integer_to_list(N) || N <- Ver1],
     ?l2b(lists:join(".", Ver2)).
+
+validate_design_access(DDoc) ->
+    validate_design_access1(DDoc, true).
+
+validate_design_access(Db, DDoc) ->
+    validate_design_access1(DDoc, couch_db:has_access_enabled(Db)).
+
+validate_design_access1(_DDoc, false) -> ok;
+validate_design_access1(DDoc, true) ->
+    is_users_ddoc(DDoc).
+
+is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
+is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).
