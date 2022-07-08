@@ -308,7 +308,9 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                         {ok, UserProps, _AuthCtx} ->
                             UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                             FullSecret = <<Secret/binary, UserSalt/binary>>,
-                            ExpectedHash = couch_util:hmac(sha256, FullSecret, User ++ ":" ++ TimeStr),
+                            ExpectedHash = couch_util:hmac(
+                                sha256, FullSecret, User ++ ":" ++ TimeStr
+                            ),
                             Hash = ?l2b(HashStr),
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
                                 "timeout", 600
